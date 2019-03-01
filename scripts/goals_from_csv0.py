@@ -4,15 +4,16 @@ import numpy as np
 import csv
 import math
 
-from tf.transformations import euler_from_quaternion as efq
-from nav_msgs.msg import Path
-from nav_msgs.msg import Odometry
-from std_msgs.msg import Header
-from std_msgs.msg import Float32
-from geometry_msgs.msg import Pose
-from geometry_msgs.msg import PoseStamped
-from geometry_msgs.msg import Point
+import actionlib
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+from actionlib_msgs.msg import GoalStatus
+#from nav_msgs.msg import Odometry
+#from std_msgs.msg import Header
+#from std_msgs.msg import Float32
+from geometry_msgs.msg import Pose, Point, PoseStamped, Quaternion
 from std_srvs.srv import EmptyResponse, Empty
+from tf.transformations import euler_from_quaternion as efq
+from tf.transformations import quaternion_from_euler as qfe
 from threading import Lock
 
 class GoalsFromCsv():
@@ -21,10 +22,12 @@ class GoalsFromCsv():
 		self.rospy = rospy
 		self.rospy.init_node(self.name, anonymous = True)
 		self.rospy.loginfo("[%s] Starting Node", self.name)
+		self.actionlib = actionlib
 		self.initParameters()
 		self.initSubscribers()
 		self.initPublishers()
 		self.initServiceClients()
+		self.initActionClients()
 		self.initVariables()
 		self.main()
 
@@ -39,6 +42,7 @@ class GoalsFromCsv():
 		self.odom_topic = self.rospy.get_param("~odom_topic", "/odometry/filtered")
 		self.frame_id = self.rospy.get_param("~frame_id","odom")
 		self.updateParamsService = self.name + self.rospy.get_param("~update_params_service", "/update_parameters")
+		self.wait_time = self.rospy.get_param("~wait_time", 5.0)
 		self.param_lock = Lock()
 		return
 
@@ -52,6 +56,11 @@ class GoalsFromCsv():
 
 	def initServiceClients(self):
 		self.service = self.rospy.Service(self.updateParamsService, Empty, self.callback_update_params)
+		return
+
+	def initActionClients(self):
+		self.action_client = self.actionlib.SimpleActionClient('move_base', MoveBaseAction)
+		self.wait = self.action_client.wait_for_server(self.rospy.Duration(self.wait_time))
 		return
 
 	def initVariables(self):
@@ -161,6 +170,9 @@ class GoalsFromCsv():
 		return
 
 	def main(self):
+		if self.wait:
+			self.rospy.loginfo("[%s] Connected to move base server", self.name)
+			self.rospy.loginfo("[%s] Starting goals achievements ...", self.name)
 		self.rospy.loginfo("[%s] Configuration OK", self.name)
 		self.read_file()
 		if self.read_flag:
