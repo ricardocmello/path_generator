@@ -37,12 +37,13 @@ class GoalsFromCsv():
 		self.goal_rate = self.rospy.get_param("~path_rate", 10)
 		self.goal_tolerances = {"xy": self.rospy.get_param("~goal_tolerances/xy", 0.3),
 								"theta": self.rospy.get_param("~goal_tolerances/theta", 0.45)}
-		self.csv_file = self.rospy.get_param("~csv_file","/home/walker/catkin_ws/src/path_generator/paths/path_points.csv")
+		self.csv_file = self.rospy.get_param("~csv_file","/home/walker/catkin_ws/src/path_generator/config/paths/path_points.csv")
 		self.csv_header = self.rospy.get_param("~csv_header",True)
 		self.odom_topic = self.rospy.get_param("~odom_topic", "/odometry/filtered")
 		self.frame_id = self.rospy.get_param("~frame_id","odom")
 		self.updateParamsService = self.name + self.rospy.get_param("~update_params_service", "/update_parameters")
 		self.wait_time = self.rospy.get_param("~wait_time", 5.0)
+		self.delay_time = self.rospy.get_param("~delay_time", 15)
 		self.param_lock = Lock()
 		return
 
@@ -187,6 +188,9 @@ class GoalsFromCsv():
 
 
 	def main(self):
+		if self.delay_time > 0:
+			self.rospy.loginfo("[%s] This node was asked to wait for %d secs before starting", self.name, self.delay_time)
+			self.rospy.sleep(self.delay_time)
 		self.rospy.loginfo("[%s] Configuration OK", self.name)
 		if self.wait:
 			self.rospy.loginfo("[%s] Connected to move base server", self.name)
