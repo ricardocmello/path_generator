@@ -47,7 +47,7 @@ class GoalsFromCsv():
 		return
 
 	def initSubscribers(self):
-		self.sub_odom = self.rospy.Subscriber(self.odom_topic, Odometry, self.callback_odom)
+		#self.sub_odom = self.rospy.Subscriber(self.odom_topic, Odometry, self.callback_odom)
 		return
 
 	def initPublishers(self):
@@ -65,8 +65,7 @@ class GoalsFromCsv():
 
 	def initVariables(self):
 		self.rate = self.rospy.Rate(self.goal_rate)
-		self.msg_goal = PoseStamped()
-		self.msg_header = Header()
+		self.msg_goal = MoveBaseGoal()
 		self.msg_pose = Pose()
 		self.change = False
 		self.read_flag = False
@@ -129,11 +128,8 @@ class GoalsFromCsv():
 		return
 
 	def make_msg_header(self):
-		#self.msg_header.seq = self.seq
-		self.msg_header.stamp = self.rospy.Time.now()
-		self.msg_header.frame_id = self.frame_id
-		self.msg_goal.header = self.msg_header
-		#self.seq += 1
+		self.msg_goal.target_pose.header.frame_id = self.frame_id
+		self.msg_goal.target_pose.header.stamp = self.rospy.Time.now()
 		return
 
 	def make_msg_pose(self):
@@ -143,58 +139,76 @@ class GoalsFromCsv():
 		self.msg_pose.orientation.y = 0
 		self.msg_pose.orientation.z = self.qz_goal
 		self.msg_pose.orientation.w = self.qw_goal
-		self.msg_goal.pose = self.msg_pose
+		self.msg_goal.target_pose.pose = self.msg_pose
 		return
 
 	def publish_goal(self):
 		self.get_current_goal()
 		self.make_msg_header()
 		self.make_msg_pose()
-		self.pub_goal.publish(self.msg_goal)
-		self.rospy.loginfo("[%s] Published Goal with ID %d", self.name, self.goal_id)
+		self.action_client.send_goal(self.msg_goal, self.callback_done, self.callback_active, self.callback_feedback)
+		self.rospy.loginfo("[%s] Sending Goal with ID %d to Action Server", self.name, self.goal_id)
 		self.goal_published = True
 		self.goal_reached = False
 		return
 
-	def check_goal(self):
-		dist_to_goal = math.sqrt((self.x_goal - self.x_bot)**2 + (self.y_goal - self.y_bot)**2)
-		angle_to_goal = abs(self.theta_goal - self.theta_bot)
-		if dist_to_goal <= self.goal_tolerances["xy"] and angle_to_goal <= self.goal_tolerances["theta"]:
-			self.rospy.loginfo("[%s] Reached Goal %d", self.name, self.goal_id)
-			self.goal_reached = True
-			self.goal_published = False
+	def callback_active(self):
+		self.rospy.loginfo("[%s] The goal with ID %d is now being processed by the Action Server...", self.name, self.goal_id)
+		return
+
+	def callback_feedback(self, feedback):
+		#self.rospy.loginfo("[%s] Feedback for goal with ID %d received", self.name, self.goal_id)
+		return
+
+	def callback_done(self, status, result):
+		if status == 2:
+			self.rospy.loginfo("[%s] The goal with ID %d received a cancel request after it started executing", self.name, self.goal_id)
+		elif status == 3:
+			self.rospy.loginfo("[%s] Reached Goal %d successfully", self.name, self.goal_id)
 			self.goal_id += 1
+			self.goal_published = False
 			if self.goal_id > self.goals_number - 1:
 				self.rospy.loginfo("[%s] Reached final goal", self.name)
 				self.final_goal_reached = True
+				return
+		elif status == 4:
+			self.rospy.loginfo("[%s] The goal with ID %d was aborted by the Action Server", self.name, self.goal_id)
+			self.rospy.signal_shutdown("Goal with ID "+str(self.goal_id)+" aborted, shutting down!")
+			return
+		elif status == 5:
+			self.rospy.loginfo("[%s] The goal with ID %d has been rejected by the Action Server", self.name, self.goal_id)
+ 			self.rospy.signal_shutdown("Goal with ID "+str(self.goal_id)+" rejected, shutting down!")
+ 			return
+		elif status == 8:
+			self.rospy.loginfo("[%s] The goal with ID %d received a cancel request before it started executing, successfully cancelled!", self.name, self.goal_id)
+		else:
+			pass
 		return
 
+
 	def main(self):
+		self.rospy.loginfo("[%s] Configuration OK", self.name)
 		if self.wait:
 			self.rospy.loginfo("[%s] Connected to move base server", self.name)
-			self.rospy.loginfo("[%s] Starting goals achievements ...", self.name)
-		self.rospy.loginfo("[%s] Configuration OK", self.name)
-		self.read_file()
-		if self.read_flag:
-			self.rospy.loginfo("[%s] Reading CSV file OK", self.name)
-			while not self.rospy.is_shutdown() and not self.exit:
-				if not self.final_goal_reached:
-					if self.change:
+			self.read_file()
+			if self.read_flag:
+				self.rospy.loginfo("[%s] Reading CSV file OK", self.name)
+				while not self.rospy.is_shutdown() and not self.exit:
+					if not self.final_goal_reached:
 						if not self.goal_published:
 							self.publish_goal()
-						if not self.goal_reached:
-							self.check_goal()
-				else:
-					if self.goals_loop:
-						self.goal_id = 0
-						self.final_goal_reached = False
 					else:
-						self.exit = True
-				self.rate.sleep()
+						if self.goals_loop:
+							self.goal_id = 0
+							self.final_goal_reached = False
+						else:
+							self.exit = True
+					self.rate.sleep()
+			else:
+				self.rospy.logerr("[%s] Reading CSV failed", self.name)
+				self.rospy.logwarn("[%s] Exiting due to CSV reading error", self.name)
 		else:
-			self.rospy.logerr("[%s] Reading CSV failed", self.name)
-			self.rospy.logwarn("[%s] Exiting due to CSV reading error", self.name)
-
+			self.rospy.logerr("Action server not available!")
 
 
 if __name__ == '__main__':
