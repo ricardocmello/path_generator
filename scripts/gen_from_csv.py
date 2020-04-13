@@ -22,8 +22,11 @@ class GoalsFromCsv():
 		self.rospy = rospy
 		self.rospy.init_node(self.name, anonymous = True)
 		self.rospy.loginfo("[%s] Starting Node", self.name)
-		self.actionlib = actionlib
 		self.initParameters()
+		if self.delay_time > 0:
+			self.rospy.loginfo("[%s] This node was asked to wait for %d secs before starting", self.name, self.delay_time)
+			self.rospy.sleep(self.delay_time)
+		self.actionlib = actionlib
 		self.initSubscribers()
 		self.initPublishers()
 		self.initServiceClients()
@@ -188,9 +191,11 @@ class GoalsFromCsv():
 
 
 	def main(self):
+		'''
 		if self.delay_time > 0:
 			self.rospy.loginfo("[%s] This node was asked to wait for %d secs before starting", self.name, self.delay_time)
 			self.rospy.sleep(self.delay_time)
+		'''
 		self.rospy.loginfo("[%s] Configuration OK", self.name)
 		if self.wait:
 			self.rospy.loginfo("[%s] Connected to move base server", self.name)
