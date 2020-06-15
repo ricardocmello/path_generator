@@ -7,5 +7,5 @@ goal_tolerances:
 csv_header: true
 frame_id: odom #map
 update_params_service: /update_parameters
-wait_time: 20 #15
-delay_time: 20 #10
+wait_time: 5 #15
+delay_time: 5 #10

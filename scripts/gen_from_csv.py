@@ -8,7 +8,7 @@ import actionlib
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from actionlib_msgs.msg import GoalStatus
 #from nav_msgs.msg import Odometry
-#from std_msgs.msg import Header
+from std_msgs.msg import String
 #from std_msgs.msg import Float32
 from geometry_msgs.msg import Pose, Point, PoseStamped, Quaternion
 from std_srvs.srv import EmptyResponse, Empty
@@ -20,15 +20,17 @@ class GoalsFromCsv():
 	def __init__(self, name):
 		self.name = name
 		self.rospy = rospy
-		self.rospy.init_node(self.name, anonymous = True)
+		self.rospy.init_node(self.name)
 		self.rospy.loginfo("[%s] Starting Node", self.name)
 		self.initParameters()
+		self.initSubscribers()
+		self.initPublishers()
+		
 		if self.delay_time > 0:
 			self.rospy.loginfo("[%s] This node was asked to wait for %d secs before starting", self.name, self.delay_time)
 			self.rospy.sleep(self.delay_time)
+		
 		self.actionlib = actionlib
-		self.initSubscribers()
-		self.initPublishers()
 		self.initServiceClients()
 		self.initActionClients()
 		self.initVariables()
@@ -37,6 +39,7 @@ class GoalsFromCsv():
 	def initParameters(self):
 		self.goals_loop = self.rospy.get_param("~goals_loop", False)
 		self.goal_topic = self.rospy.get_param("~goal_topic", "/move_base_simple/goal")
+		self.status_topic = self.rospy.get_param("~status_topic", "/experiment_status")
 		self.goal_rate = self.rospy.get_param("~path_rate", 10)
 		self.goal_tolerances = {"xy": self.rospy.get_param("~goal_tolerances/xy", 0.3),
 								"theta": self.rospy.get_param("~goal_tolerances/theta", 0.45)}
@@ -56,6 +59,8 @@ class GoalsFromCsv():
 
 	def initPublishers(self):
 		self.pub_goal = self.rospy.Publisher(self.goal_topic, PoseStamped, queue_size = 5)
+		# Adding a new publisher to broadcast the status of the task
+		self.pub_status = self.rospy.Publisher(self.status_topic, String, queue_size = 5)
 		return
 
 	def initServiceClients(self):
@@ -116,7 +121,7 @@ class GoalsFromCsv():
 							self.goals = row_i
 						else:
 							self.goals = np.concatenate((self.goals, row_i))
-				self.goals_number = self.goals.size
+				self.goals_number = len(self.goals)
 			self.read_flag = True
 		except Exception as e:
 			print(e)
@@ -154,7 +159,13 @@ class GoalsFromCsv():
 		self.rospy.loginfo("[%s] Sending Goal with ID %d to Action Server", self.name, self.goal_id)
 		self.goal_published = True
 		self.goal_reached = False
+		if self.goal_id ==0: self.publish_status("Started")
 		return
+
+	def publish_status(self, status):
+		self.pub_status.publish(status)
+		self.pub_status.publish(status)
+		self.pub_status.publish(status)
 
 	def callback_active(self):
 		self.rospy.loginfo("[%s] The goal with ID %d is now being processed by the Action Server...", self.name, self.goal_id)
@@ -199,6 +210,7 @@ class GoalsFromCsv():
 		self.rospy.loginfo("[%s] Configuration OK", self.name)
 		if self.wait:
 			self.rospy.loginfo("[%s] Connected to move base server", self.name)
+			
 			self.read_file()
 			if self.read_flag:
 				self.rospy.loginfo("[%s] Reading CSV file OK", self.name)
@@ -211,6 +223,7 @@ class GoalsFromCsv():
 							self.goal_id = 0
 							self.final_goal_reached = False
 						else:
+							self.publish_status("Finished")
 							self.exit = True
 					self.rate.sleep()
 			else:
