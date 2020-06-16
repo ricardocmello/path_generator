@@ -3,6 +3,7 @@ import rospy
 import numpy as np
 import csv
 import math
+import time
 
 import actionlib
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
@@ -164,7 +165,9 @@ class GoalsFromCsv():
 
 	def publish_status(self, status):
 		self.pub_status.publish(status)
+		time.sleep(0.05)
 		self.pub_status.publish(status)
+		time.sleep(0.05)
 		self.pub_status.publish(status)
 
 	def callback_active(self):
@@ -208,6 +211,7 @@ class GoalsFromCsv():
 			self.rospy.sleep(self.delay_time)
 		'''
 		self.rospy.loginfo("[%s] Configuration OK", self.name)
+		self.publish_status("Not Started")
 		if self.wait:
 			self.rospy.loginfo("[%s] Connected to move base server", self.name)
 			
