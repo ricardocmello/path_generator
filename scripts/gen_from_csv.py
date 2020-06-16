@@ -160,14 +160,14 @@ class GoalsFromCsv():
 		self.rospy.loginfo("[%s] Sending Goal with ID %d to Action Server", self.name, self.goal_id)
 		self.goal_published = True
 		self.goal_reached = False
-		if self.goal_id ==0: self.publish_status("Started")
+		if self.goal_id == 0: self.publish_status("Started")
 		return
 
 	def publish_status(self, status):
 		self.pub_status.publish(status)
-		time.sleep(0.05)
+		time.sleep(0.1)
 		self.pub_status.publish(status)
-		time.sleep(0.05)
+		time.sleep(0.1)
 		self.pub_status.publish(status)
 
 	def callback_active(self):
@@ -217,6 +217,7 @@ class GoalsFromCsv():
 			
 			self.read_file()
 			if self.read_flag:
+				self.publish_status("Not Started")
 				self.rospy.loginfo("[%s] Reading CSV file OK", self.name)
 				while not self.rospy.is_shutdown() and not self.exit:
 					if not self.final_goal_reached:
