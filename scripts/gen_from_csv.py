@@ -205,11 +205,11 @@ class GoalsFromCsv():
 
 
 	def main(self):
-		'''
+		
 		if self.delay_time > 0:
 			self.rospy.loginfo("[%s] This node was asked to wait for %d secs before starting", self.name, self.delay_time)
 			self.rospy.sleep(self.delay_time)
-		'''
+		
 		self.rospy.loginfo("[%s] Configuration OK", self.name)
 		self.publish_status("Not Started")
 		if self.wait:
